@@ -9,7 +9,7 @@ const client = new Client({
 });
 
 // Replace with your actual deployed Apps Script Web App URL ending in /exec
-const APPS_SCRIPT_URL = "YOUR_DEPLOYED_WEB_APP_EXEC_URL";
+const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_URL;
 
 client.on('messageCreate', async (message) => {
   if (message.author.bot || !message.content.startsWith('gb')) return;
@@ -47,4 +47,4 @@ client.on('messageCreate', async (message) => {
   }
 });
 
-client.login("YOUR_DISCORD_BOT_TOKEN");
+client.login(process.env.DISCORD_BOT_TOKEN);
