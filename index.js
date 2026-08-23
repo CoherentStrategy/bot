@@ -55,7 +55,7 @@ client.on('messageCreate', async (message) => {
     }
 
     // React with success emoji if message posted
-    await message.react("✅Your bot has ran into a success :) We're collecting some success data and will restart the bot in a few seconds.");
+    await message.reply("Your bot has ran into a success :) We're collecting some success data and will restart the bot in a few seconds.");
 
   } catch (err) {
     console.error('Fetch error:', err);
