@@ -1,13 +1,8 @@
 {
-  "name": "discord-gchat-bridge",
+  "name": "discord-chat-bridge",
   "version": "1.0.0",
   "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
-  },
   "dependencies": {
-    "axios": "^1.6.0",
-    "discord.js": "^14.14.0",
-    "dotenv": "^17.4.2"
+    "discord.js": "^14.14.1"
   }
 }
