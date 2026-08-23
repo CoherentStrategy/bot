@@ -9,7 +9,7 @@ const client = new Client({
 });
 
 // Replace with your actual deployed Apps Script Web App URL ending in /exec
-const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_URL;
+const APPS_SCRIPT_WEBAPP_URL = process.env.APPS_SCRIPT_WEBAPP_URL;
 
 client.on('messageCreate', async (message) => {
   if (message.author.bot || !message.content.startsWith('gb')) return;
@@ -26,7 +26,7 @@ client.on('messageCreate', async (message) => {
   }
 
   try {
-    const response = await fetch(APPS_SCRIPT_URL, {
+    const response = await fetch(APPS_SCRIPT_WEBAPP_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
