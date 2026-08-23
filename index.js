@@ -1,100 +1,53 @@
 require('dotenv').config();
 
 const { Client, GatewayIntentBits } = require('discord.js');
-const axios = require('axios');
-
-const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
-const APPS_SCRIPT_WEBAPP_URL = process.env.APPS_SCRIPT_WEBAPP_URL;
-
-// Optional fallback target if no space/DM is specified
-const DEFAULT_TARGET = process.env.DEFAULT_TARGET || 'spaces/6zmCrUAAAAE';
+const fetch = require('node-fetch');
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-  ],
+    GatewayIntentBits.MessageContent
+  ]
 });
 
-client.once('ready', () => {
-  console.log(`Bridge bot online as ${client.user.tag}`);
-});
+// Replace with your actual deployed Apps Script Web App URL ending in /exec
+const APPS_SCRIPT_URL = "YOUR_DEPLOYED_WEB_APP_EXEC_URL";
 
 client.on('messageCreate', async (message) => {
-  if (message.author.bot) return;
+  if (message.author.bot || !message.content.startsWith('gb')) return;
 
-  const content = message.content.trim();
-  if (!content.toLowerCase().startsWith('gb')) return;
+  // Example Syntax 1 (DM):    gb dm recipient@yourdomain.com Hello from Discord!
+  // Example Syntax 2 (Space): gb space AAAAxxxxxx Hello Space!
+  const args = message.content.slice(2).trim().split(/ +/);
+  const targetType = args.shift()?.toLowerCase(); // 'dm' or 'space'
+  const target = args.shift();                    // email or space ID
+  const textContent = args.join(' ');
 
-  const rawArgs = content.substring(2).trim();
-
-  if (!rawArgs) {
-    return message.reply(
-      '**gb Usage:**\n' +
-      '• `gb "user@domain.com" Your message` (DM via email)\n' +
-      '• `gb "spaces/AAAA..." Your message` (Specific Space ID)\n' +
-      '• `gb Your message` (Sends to default space)'
-    );
-  }
-
-  let targetName = '';
-  let textToSend = '';
-
-  // 1. Quoted Target Name -> gb "user@domain.com" Hello!
-  if (rawArgs.startsWith('"')) {
-    const closingQuoteIndex = rawArgs.indexOf('"', 1);
-    if (closingQuoteIndex !== -1) {
-      targetName = rawArgs.substring(1, closingQuoteIndex).trim();
-      textToSend = rawArgs.substring(closingQuoteIndex + 1).trim();
-    }
-  }
-
-  // 2. Direct Space ID Target -> gb spaces/AAAA12345 Hello!
-  if (!targetName && rawArgs.startsWith('spaces/')) {
-    const firstSpaceIndex = rawArgs.indexOf(' ');
-    if (firstSpaceIndex !== -1) {
-      targetName = rawArgs.substring(0, firstSpaceIndex).trim();
-      textToSend = rawArgs.substring(firstSpaceIndex + 1).trim();
-    }
-  }
-
-  // 3. Fallback: Entire text goes to default destination
-  if (!targetName) {
-    targetName = DEFAULT_TARGET;
-    textToSend = rawArgs;
-  }
-
-  if (!textToSend) {
-    return message.reply('Please provide a text message to send.');
+  if (!targetType || !target || !textContent) {
+    return message.reply('gb Command Usage:\n`gb dm <email> <message>`\n`gb space <spaceId> <message>`');
   }
 
   try {
-    // Post to Apps Script Web App handling 302 redirects explicitly
-    const response = await axios.post(
-      APPS_SCRIPT_WEBAPP_URL,
-      {
-        target: targetName,
-        text: `[Discord - ${message.author.username}]: ${textToSend}`,
-      },
-      {
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8', // Prevents Apps Script CORS / pre-flight issues
-        },
-        maxRedirects: 5,
-      }
-    );
+    const response = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: targetType,
+        target: target,
+        content: textContent
+      })
+    });
 
-    if (response.data && response.data.status === 'success') {
-      await message.react('✅');
+    const result = await response.json();
+    if (result.error) {
+      message.reply(`Error: ${result.error}`);
     } else {
-      const errorMsg = response.data ? response.data.message : 'Unknown response from Apps Script.';
-      await message.reply(`❌ **Google Chat Error:** ${errorMsg}`);
+      message.react('✅');
     }
-  } catch (error) {
-    console.error('HTTP Request Error:', error.response ? error.response.data : error.message);
-    await message.reply('❌ **Connection Error:** Could not reach the Google Apps Script endpoint.');
+  } catch (err) {
+    message.reply(`Failed to route message: ${err.message}`);
   }
 });
 
-client.login(DISCORD_BOT_TOKEN);
+client.login("YOUR_DISCORD_BOT_TOKEN");
