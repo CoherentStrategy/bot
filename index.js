@@ -37,14 +37,21 @@ client.on('messageCreate', async (message) => {
     });
 
     const result = await response.json();
+    
     if (result.error) {
-      message.reply(`Error: ${result.error}`);
+      // Unpacks [object Object] into readable JSON text
+      const errorDetails = typeof result.error === 'object'
+        ? JSON.stringify(result.error, null, 2)
+        : result.error;
+
+      message.reply(`Google Chat Error:\n\`\`\`json\n${errorDetails}\n\`\`\``);
     } else {
       message.react('✅');
     }
   } catch (err) {
     message.reply(`Failed to route message: ${err.message}`);
   }
+  const result = await response.json();
 });
 
 client.login(process.env.DISCORD_BOT_TOKEN);
