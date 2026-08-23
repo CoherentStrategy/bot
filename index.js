@@ -29,7 +29,7 @@ client.on('messageCreate', async (message) => {
 
   if (!rawArgs) {
     return message.reply(
-      '**Usage:**\n' +
+      '**gb Usage:**\n' +
       '• `gb "user@domain.com" Your message` (DM via email)\n' +
       '• `gb "spaces/AAAA..." Your message` (Specific Space ID)\n' +
       '• `gb Your message` (Sends to default space)'
