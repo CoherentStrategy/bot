@@ -1,18 +1,17 @@
 const { Client, GatewayIntentBits } = require('discord.js');
 const axios = require('axios');
 
-// Environment variables (loads from Render or your local environment)
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const APPS_SCRIPT_WEBAPP_URL = process.env.APPS_SCRIPT_WEBAPP_URL;
 
-// Optional fallback target if no space/DM is specified in the message
-const DEFAULT_TARGET = 'spaces/6zmCrUAAAAE';
+// Optional fallback target if no space/DM is specified
+const DEFAULT_TARGET = process.env.DEFAULT_TARGET || 'spaces/6zmCrUAAAAE';
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent, // Required to read "gb" commands
+    GatewayIntentBits.MessageContent,
   ],
 });
 
@@ -21,30 +20,26 @@ client.once('ready', () => {
 });
 
 client.on('messageCreate', async (message) => {
-  // Prevent loops by ignoring other bots
   if (message.author.bot) return;
 
   const content = message.content.trim();
-
-  // Filter for commands starting with "gb"
   if (!content.toLowerCase().startsWith('gb')) return;
 
   const rawArgs = content.substring(2).trim();
 
-  // Help command fallback
   if (!rawArgs) {
     return message.reply(
       '**Usage:**\n' +
-      '• `gb "Space Name" Your message` (multi-word space name)\n' +
-      '• `gb SpaceName Your message` (single-word space or DM name)\n' +
-      '• `gb Your message` (sends to default destination)'
+      '• `gb "user@domain.com" Your message` (DM via email)\n' +
+      '• `gb "spaces/AAAA..." Your message` (Specific Space ID)\n' +
+      '• `gb Your message` (Sends to default space)'
     );
   }
 
   let targetName = '';
   let textToSend = '';
 
-  // 1. Quoted Target Name -> gb "Marketing Team" Hello!
+  // 1. Quoted Target Name -> gb "user@domain.com" Hello!
   if (rawArgs.startsWith('"')) {
     const closingQuoteIndex = rawArgs.indexOf('"', 1);
     if (closingQuoteIndex !== -1) {
@@ -53,39 +48,49 @@ client.on('messageCreate', async (message) => {
     }
   }
 
-  // 2. Single-Word Target Name or Raw ID -> gb General Hello!
-  if (!targetName) {
-    const parts = rawArgs.split(/\s+/);
-    const possibleTarget = parts[0];
-
-    if (possibleTarget.startsWith('spaces/') || parts.length > 1) {
-      targetName = possibleTarget;
-      textToSend = parts.slice(1).join(' ');
-    } else {
-      // 3. Fallback: Entire text goes to default space/DM
-      targetName = DEFAULT_TARGET;
-      textToSend = rawArgs;
+  // 2. Direct Space ID Target -> gb spaces/AAAA12345 Hello!
+  if (!targetName && rawArgs.startsWith('spaces/')) {
+    const firstSpaceIndex = rawArgs.indexOf(' ');
+    if (firstSpaceIndex !== -1) {
+      targetName = rawArgs.substring(0, firstSpaceIndex).trim();
+      textToSend = rawArgs.substring(firstSpaceIndex + 1).trim();
     }
+  }
+
+  // 3. Fallback: Entire text goes to default destination
+  if (!targetName) {
+    targetName = DEFAULT_TARGET;
+    textToSend = rawArgs;
   }
 
   if (!textToSend) {
-    return message.reply('Please provide a message text to send.');
+    return message.reply('Please provide a text message to send.');
   }
 
-  // Forward request to Google Apps Script Web App
   try {
-    const response = await axios.post(APPS_SCRIPT_WEBAPP_URL, {
-      target: targetName,
-      text: `[Discord - ${message.author.username}]: ${textToSend}`
-    });
+    // Post to Apps Script Web App handling 302 redirects explicitly
+    const response = await axios.post(
+      APPS_SCRIPT_WEBAPP_URL,
+      {
+        target: targetName,
+        text: `[Discord - ${message.author.username}]: ${textToSend}`,
+      },
+      {
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8', // Prevents Apps Script CORS / pre-flight issues
+        },
+        maxRedirects: 5,
+      }
+    );
 
-    if (response.data.status === 'success') {
+    if (response.data && response.data.status === 'success') {
       await message.react('✅');
     } else {
-      await message.reply(`❌ **Google Chat Error:** ${response.data.message || 'Failed to send message.'}`);
+      const errorMsg = response.data ? response.data.message : 'Unknown response from Apps Script.';
+      await message.reply(`❌ **Google Chat Error:** ${errorMsg}`);
     }
   } catch (error) {
-    console.error('HTTP Request Error:', error.message);
+    console.error('HTTP Request Error:', error.response ? error.response.data : error.message);
     await message.reply('❌ **Connection Error:** Could not reach the Google Apps Script endpoint.');
   }
 });
